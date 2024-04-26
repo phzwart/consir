@@ -1,0 +1,13 @@
+# This file contains values from Cookiecutter
+
+default_context:
+  project_name: "consir"
+  project_description: "Conformal Estimation and SIRENS"
+  organization: "phzwart"
+  license: "MIT"
+  minimal_python_version: 3.9
+  github_name: "phzwart/consir"
+  email: "phzwart@lbl.gov"
+  version: "0.0.1"
+  line_length: "88"
+  create_example_template: "cli"
