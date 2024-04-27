@@ -1,8 +1,9 @@
-import torch
 import pytest
+import torch
+
 from consir.functions.ackley import (
     ackley_function,
-)  # Ensure to replace 'your_module' with the actual name of your module
+)
 
 
 @pytest.mark.parametrize(

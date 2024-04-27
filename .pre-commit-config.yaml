@@ -11,4 +11,4 @@ repos:
     rev: 24.4.2  # Use the latest revision
     hooks:
       - id: black
-        language_version: python3.9  # Ensure this matches your environment
+        language_version: python3.11  # Ensure this matches your environment

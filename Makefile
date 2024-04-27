@@ -10,7 +10,7 @@ VERSION := latest
 #* Poetry
 .PHONY: poetry-download
 poetry-download:
-        curl -sSL https://install.python-poetry.org | python3 -
+	curl -sSL https://install.python-poetry.org | python -
 
 .PHONY: poetry-remove
 poetry-remove:
@@ -30,7 +30,7 @@ pre-commit-install:
 #* Formatters
 .PHONY: codestyle
 codestyle:
-	poetry run pyupgrade --exit-zero-even-if-changed --py39-plus **/*.py
+	poetry run python -c "import glob;import subprocess;[subprocess.run(['poetry', 'run', 'pyupgrade', '--exit-zero-even-if-changed', '--py39-plus', file]) for file in glob.glob('**/*.py', recursive=True)]"
 	poetry run isort --settings-path pyproject.toml ./
 	poetry run black --config pyproject.toml ./
 
