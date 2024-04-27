@@ -1,7 +1,7 @@
 import torch
 
 
-def sphere(coords):
+def sphere_function(coords):
     """
     Compute the Sphere function for a set of points in N-dimensional space.
 

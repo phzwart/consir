@@ -46,7 +46,7 @@ def test_rosenbrock_zero_vector():
     """
     zero_vector = torch.zeros(1, 10).type(torch.FloatTensor)
     expected_value = torch.tensor(
-        [100.0]
-    )  # Because the formula results in 100 * (0-0^2)^2 + (1-0)^2 for each pair
+        [9.0]
+    )  # Because the formula results in (10-1)(100 * (0-0^2)^2 + (1-0)^2) for each pair
     result = rosenbrock_function(zero_vector)
     torch.testing.assert_close(result, expected_value, atol=0.001, rtol=0.001)

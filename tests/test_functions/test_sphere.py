@@ -30,7 +30,7 @@ def test_sphere(inputs, expected, tol):
     """
     Test the sphere_function with various inputs and check if the output matches the expected values.
     """
-    result = {sphere_function}(inputs.float())
+    result = sphere_function(inputs.float())
     print(inputs, expected, result)
     torch.testing.assert_close(
         result, expected, rtol=tol, atol=tol

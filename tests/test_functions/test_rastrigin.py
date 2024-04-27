@@ -15,11 +15,13 @@ from consir.functions.rastrigin import (
             0.001,
         ),  # Global minimum @ zero
         (
-            torch.full((1, 10), 2) * torch.pi,
-            torch.tensor([100]),
+            torch.full((1, 10), 2 * torch.pi),
+            torch.tensor([515.48]),
             0.001,
         ),  # Local minimum @ 2*pi in each dimension. Note: This is outside the typical search domain for the rastrigin function,
         # which, because of the periodic nature of cosine, should not be an issue and can help us better understand the function across a more robust domain. Remove if neccessary.
+        (torch.ones(1, 10).float(), torch.tensor([10.0]), 0.001),  # Test with all ones
+        (torch.full((1, 10), 2), torch.tensor([40.0]), 0.001),  # Test with all twos
     ],
 )
 def test_rastrigin(inputs, expected, tol):
