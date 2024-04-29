@@ -1,35 +1,39 @@
-"""Test for siner functions"""
+"""Test for SIREN functions"""
 
 import pytest
 import torch
-from consir.sirens import siren
+import numpy as np
+from torch import nn
+
+# Assuming the new Siren classes are in a module named my_siren_module
+from consir.sirens.siren import SineLayer, Siren
 
 
-def test_siren_layer_initialization():
+def test_sine_layer_initialization():
     """
-    Test the initialization of the SirenLayer to ensure weights are set correctly.
+    Test the initialization of the SineLayer to ensure weights are set correctly.
     """
     in_features = 5
     out_features = 10
-    w0 = 1.0
-    layer = siren.SirenLayer(in_features, out_features, w0)
+    is_first = False
+    omega_0 = 30.0
+    layer = SineLayer(in_features, out_features, is_first=is_first, omega_0=omega_0)
 
-    # Check if weights are within the expected range
-    expected_lower_bound = -torch.sqrt(torch.tensor(6.0 / in_features)) / w0
-    expected_upper_bound = torch.sqrt(torch.tensor(6.0 / in_features)) / w0
+    # Check if weights are within the expected range for not the first layer
+    expected_lower_bound = -np.sqrt(6 / in_features) / omega_0
+    expected_upper_bound = np.sqrt(6 / in_features) / omega_0
     assert torch.all(layer.linear.weight <= expected_upper_bound) and torch.all(
         layer.linear.weight >= expected_lower_bound
     ), "Weights are not initialized within the expected range."
 
 
-def test_siren_layer_forward():
+def test_sine_layer_forward():
     """
-    Test the forward pass of the SirenLayer.
+    Test the forward pass of the SineLayer.
     """
     in_features = 5
     out_features = 10
-    w0 = 1.0
-    layer = siren.SirenLayer(in_features, out_features, w0)
+    layer = SineLayer(in_features, out_features)
     input_tensor = torch.randn(1, in_features)
     output = layer(input_tensor)
 
@@ -38,33 +42,35 @@ def test_siren_layer_forward():
     assert torch.is_tensor(output), "Output is not a tensor."
 
 
-def test_siren_model_initialization():
+def test_siren_initialization():
     """
-    Test the initialization of the SirenModel to verify correct layer setup.
+    Test the initialization of the Siren model to verify correct layer setup.
     """
-    input_features = 2
-    output_features = 1
-    hidden_layers = [32, 32, 32]
-    model = siren.SirenModel(input_features, output_features, hidden_layers)
+    in_features = 2
+    hidden_features = 32
+    hidden_layers = 3
+    out_features = 1
+    model = Siren(in_features, hidden_features, hidden_layers, out_features)
 
     # Check the number of layers
-    expected_num_layers = len(hidden_layers) + 1  # Including the output layer
+    expected_num_layers = hidden_layers + 2  # Including first and last layers
     assert (
         len(model.net) == expected_num_layers
     ), "Incorrect number of layers in the model."
 
 
-def test_siren_model_forward():
+def test_siren_forward():
     """
-    Test the forward pass of the SirenModel.
+    Test the forward pass of the Siren model.
     """
-    input_features = 2
-    output_features = 1
-    hidden_layers = [32, 32, 32]
-    model = siren.SirenModel(input_features, output_features, hidden_layers)
-    input_tensor = torch.randn(10, input_features)  # Batch of 10
-    output = model(input_tensor)
+    in_features = 2
+    hidden_features = 32
+    hidden_layers = 3
+    out_features = 1
+    model = Siren(in_features, hidden_features, hidden_layers, out_features)
+    input_tensor = torch.randn(10, in_features)  # Batch of 10
+    output, _ = model(input_tensor)
 
     # Check output shape and type
-    assert output.shape == (10, output_features), "Output shape is incorrect."
+    assert output.shape == (10, out_features), "Output shape is incorrect."
     assert torch.is_tensor(output), "Output is not a tensor."
