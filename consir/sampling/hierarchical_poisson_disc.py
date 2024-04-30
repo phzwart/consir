@@ -300,7 +300,7 @@ class PoissonDiskSamplingPrecomputed(object):
                 if np.linalg.norm(point - other_point) < self.r:
                     return False
         return True
-
+    
     def sample(self):
         """
         Generates a sample of points using the precomputed points and Poisson Disk Sampling method.
@@ -308,18 +308,21 @@ class PoissonDiskSamplingPrecomputed(object):
 
         Returns:
             ndarray: An array of sampled points.
+            list: List of indices corresponding to the original precomputed points.
         """
         self.initialize_grid()
         self.samples = []
         self.idx_to_point = {}
+        original_indices = []  # List to store indices of the original precomputed points
 
-        initial_point = self.precomputed_points[
-            np.random.randint(len(self.precomputed_points))
-        ]
-        active_list = [0]
+        initial_index = np.random.randint(len(self.precomputed_points))
+        initial_point = self.precomputed_points[initial_index]
         self.samples = [initial_point]
         self.idx_to_point = {0: initial_point}
+        original_indices.append(initial_index)  # Append the index of the initial point
         self.insert_sample(initial_point, 0)
+
+        active_list = [0]
 
         while active_list:
             i = np.random.choice(active_list)
@@ -329,19 +332,22 @@ class PoissonDiskSamplingPrecomputed(object):
             valid_found = False
             for point in new_points:
                 if (
-                    all(point >= self.domain[:, 0])
-                    and all(point < self.domain[:, 1])
-                    and self.is_valid_point(point)
+                    all(point >= self.domain[:, 0]) and
+                    all(point < self.domain[:, 1]) and
+                    self.is_valid_point(point)
                 ):
                     self.samples.append(point)
                     new_index = len(self.samples) - 1
                     self.insert_sample(point, new_index)
                     active_list.append(new_index)
                     self.idx_to_point[new_index] = point
+                    # Find the index of this new point in the original precomputed list
+                    original_idx = np.where((self.precomputed_points == point).all(axis=1))[0][0]
+                    original_indices.append(original_idx)
                     valid_found = True
                     break
 
             if not valid_found:
                 active_list.remove(i)
 
-        return np.array(self.samples)
+        return np.array(self.samples), original_indices
