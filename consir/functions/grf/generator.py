@@ -1,7 +1,7 @@
 import torch
 
 
-def generate_grf(grid_size, alpha, device="cpu"):
+def generate_grf(grid_size, alpha, device="cpu", eps=1e-3):
     linspaced = torch.linspace(
         -1, 1, steps=grid_size, device=device
     )  # create a linear spaced grid of even spaced points between -1 and 1 with 'grid_size' number of points
@@ -28,5 +28,7 @@ def generate_grf(grid_size, alpha, device="cpu"):
     grf = torch.fft.ifft2(
         fft_noise * covariance_matrix
     ).real  # modify the amp. of the frequencies based on the covariance, then transform the modfied frequency domain back to spatial
+
+    assert torch.std(grf) > eps, "A flat image was generated. Increase alpha"
 
     return grf
