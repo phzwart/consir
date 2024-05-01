@@ -2,6 +2,9 @@ import numpy as np
 from consir.sampling import hierarchical_poisson_disc  
 
 def shift_labels(array):
+    """
+    Renumber labels in increasing 
+    """
     # Find unique values and sort them
     unique_values = np.unique(array)
     # Create a map from old values to new values
@@ -56,7 +59,6 @@ def sample_points_hierarchically(radius, domain=[(0, 1), (0, 1)], factor=np.sqrt
         )
         new_set, new_indices = sub_sampler.sample()
         
-
         print("Level:", len(levels)//len(initial_set), "New points:", len(new_set))
 
         # Check if new points were added
