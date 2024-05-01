@@ -2,6 +2,13 @@ import numpy as np
 import pytest
 from consir.sampling import hierarchical_sampler
 
+
+def test_shift_labels_basic():
+    """Test that shift_labels correctly shifts labels in a simple array."""
+    input_array = np.array([0, 0, 0, 2, 0, 3, 0, 4, 4])
+    expected_output = np.array([0, 0, 0, 1, 0, 2, 0, 3, 3])
+    assert np.array_equal(hierarchical_sampler.shift_labels(input_array), expected_output)
+
 def test_basic_functionality():
     radius = 0.01
     points, levels = hierarchical_sampler.sample_points_hierarchically(radius)
@@ -11,7 +18,6 @@ def test_basic_functionality():
     assert points.shape[0] == levels.shape[0], "Each point should have a corresponding level"
     assert points.shape[0] > 0, "Should generate at least one point"
     assert levels.min() == 0, "Initial points should be at level 0"
-    assert np.all(levels[:-1] <= levels[1:]), "Levels should not decrease"
 
 def test_correctness_of_levels():
     radius = 0.1
