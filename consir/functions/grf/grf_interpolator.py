@@ -31,20 +31,25 @@ class GridInterpolator:
             torch.Tensor: Interpolated values at the given points, shaped (K, 1).
         """
         # Normalize points from the given domain to [0, 1]
-        points[:, 0] = (points[:, 0] - self.x_min) / (self.x_max - self.x_min)
-        points[:, 1] = (points[:, 1] - self.y_min) / (self.y_max - self.y_min)
+        tpoints = points.clone()
+        tpoints[:, 0] = (tpoints[:, 0] - self.x_min) / (self.x_max - self.x_min)
+        tpoints[:, 1] = (tpoints[:, 1] - self.y_min) / (self.y_max - self.y_min)
 
         # Scale points from [0, 1] to [-1, 1] (required by grid_sample)
-        points = 2 * points - 1
+        tpoints = 2 * tpoints - 1
 
-        points = points[:, [1, 0]]
+        tpoints = tpoints[:, [1, 0]]
 
         # Reshape points for grid_sample: (batch size, height, width, 2)
-        points = points.unsqueeze(0).unsqueeze(1)  # Shape: (1, 1, K, 2)
+        tpoints = tpoints.unsqueeze(0).unsqueeze(1)  # Shape: (1, 1, K, 2)
 
         # Interpolate using grid_sample
         interpolated_values = F.grid_sample(
-            self.grid, points, mode="bicubic", padding_mode="zeros", align_corners=True
+            self.grid,
+            tpoints,
+            mode="bilinear",
+            padding_mode="zeros",
+            align_corners=True,
         )
 
         # Remove unnecessary dimensions and return the result shaped (K, 1)
