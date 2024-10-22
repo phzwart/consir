@@ -1,5 +1,5 @@
 import numpy as np
-from consir.sampling import hierarchical_poisson_disc
+from consir.sampling.bottomup import hierarchical_poisson_disc
 
 
 def shift_labels(array):

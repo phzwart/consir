@@ -1,0 +1,171 @@
+import numpy as np
+from scipy.spatial import KDTree
+import matplotlib.pyplot as plt
+
+
+class PoissonDiskSamplerWithExisting(object):
+    """
+    A class to generate samples using Poisson Disk Sampling within a specified domain,
+    constrained by an existing set of points.
+
+    Attributes:
+        domain (list of tuples): Boundaries for each dimension in the domain.
+        r (float): Minimum distance between samples.
+        k (int): Maximum number of attempts to generate a new sample around each existing sample.
+        existing_points (ndarray): Array of points that already exist in the domain and must be respected.
+        wrap (bool): Whether to use wrap-around edges for tiling.
+    """
+
+    def __init__(self, domain, r, existing_points=None, k=60, symmetry_operators=None, wrap=False):
+        """
+        Initializes the PoissonDiskSamplerWithExisting with the given domain, minimum distance, and optional parameters.
+
+        Args:
+            domain (list of tuples): Boundaries for each dimension in the domain, as (min, max) pairs.
+            r (float): Minimum distance between samples.
+            existing_points (ndarray, optional): Array of pre-existing points. Defaults to None.
+            k (int, optional): Maximum number of attempts to generate a new sample. Defaults to 60.
+            symmetry_operators (list of callables, optional): List of symmetry operations to apply to the points. Each operator is a function that takes a point and returns a transformed point.
+            wrap (bool, optional): Whether to use wrap-around edges for tiling. Defaults to False.
+        """
+        self.domain = np.array(domain)
+        self.r = r
+        self.k = k
+        self.dimensions = len(domain)
+        self.cell_size = r / np.sqrt(self.dimensions)
+        self.existing_points = existing_points
+        self.symmetry_operators = symmetry_operators if symmetry_operators is not None else []
+        self.wrap = wrap
+
+        if existing_points is not None:
+            self.samples = existing_points.tolist()
+            self.idx_to_point = {i: pt for i, pt in enumerate(existing_points)}
+            self.kdtree = KDTree(existing_points)
+            self.labels = np.array(["existing"] * len(existing_points))  # Labels for existing points
+        else:
+            self.samples = []
+            self.idx_to_point = {}
+            self.kdtree = None
+            self.labels = np.array([])
+
+    def generate_points_around(self, point):
+        """
+        Generates potential points around a given sample within the allowed radius.
+
+        Args:
+            point (array-like): The point around which to generate new points.
+
+        Returns:
+            ndarray: Array of new points around the given point.
+        """
+        radius = np.sqrt(np.random.uniform(self.r**2, (2 * self.r) ** 2, self.k))
+        directions = np.random.normal(0, 1, (self.k, self.dimensions))
+        unit_vectors = directions / np.linalg.norm(directions, axis=1)[:, None]
+        new_points = point + radius[:, None] * unit_vectors
+
+        if self.wrap:
+            # Apply wrap-around for each dimension with arbitrary bounds
+            for dim in range(self.dimensions):
+                min_bound, max_bound = self.domain[dim]
+                new_points[:, dim] = (new_points[:, dim] - min_bound) % (max_bound - min_bound) + min_bound
+
+        return new_points
+
+    def is_valid_point(self, point):
+        """
+        Checks if a point is valid by ensuring it doesn't violate the minimum distance rule.
+
+        Args:
+            point (array-like): The point to check.
+
+        Returns:
+            bool: True if the point is valid, False otherwise.
+        """
+        if np.any(point < self.domain[:, 0]) or np.any(point >= self.domain[:, 1]):
+            return False
+
+        if self.kdtree is not None:
+            # Use KDTree to find the nearest neighbors within distance r
+            indices = self.kdtree.query_ball_point(point, self.r)
+            if len(indices) > 0:
+                return False
+
+        # Check against the new points being added in this sampling iteration
+        for existing_point in self.samples:
+            if self.wrap:
+                # Apply wrap-around distance calculation with arbitrary bounds
+                dist = np.sqrt(np.sum(
+                    np.minimum(
+                        np.abs(point - existing_point),
+                        (self.domain[:, 1] - self.domain[:, 0]) - np.abs(point - existing_point)
+                    ) ** 2
+                ))
+            else:
+                dist = np.linalg.norm(point - existing_point)
+
+            if dist < self.r:
+                return False
+
+        return True
+
+    def apply_symmetry(self, point):
+        """
+        Applies all symmetry operations to a point and returns a list of all resulting points.
+
+        Args:
+            point (array-like): The point to which symmetry operations are applied.
+
+        Returns:
+            list: A list of points generated by applying the symmetry operators.
+        """
+        symmetric_points = [point]
+        for op in self.symmetry_operators:
+            transformed_point = op(point)
+            if transformed_point is not None:
+                symmetric_points.append(transformed_point)
+        return symmetric_points
+
+    def sample(self):
+        """
+        Generates a sample of points using the Poisson Disk Sampling method, constrained by existing points.
+
+        Returns:
+            tuple: An array of newly sampled points and an array of labels ("existing" or "new").
+        """
+        if not self.samples:
+            # If no existing points, initialize with a random point in the domain
+            initial_point = np.random.uniform(self.domain[:, 0], self.domain[:, 1], self.dimensions)
+            symmetric_points = self.apply_symmetry(initial_point)
+            self.samples.extend(symmetric_points)
+            for idx, point in enumerate(symmetric_points):
+                self.idx_to_point[idx] = point
+            self.labels = np.concatenate((self.labels, np.array(["new"] * len(symmetric_points))))
+            active_list = list(range(len(self.samples)))
+        else:
+            # Start with all existing points as active
+            active_list = list(range(len(self.samples)))
+
+        while active_list:
+            i = np.random.choice(active_list)
+            current_point = self.samples[i]
+            new_points = self.generate_points_around(current_point)
+
+            valid_found = False
+            for point in new_points:
+                if self.is_valid_point(point):
+                    symmetric_points = self.apply_symmetry(point)
+                    for sym_point in symmetric_points:
+                        if self.is_valid_point(sym_point):
+                            self.samples.append(sym_point)
+                            new_index = len(self.samples) - 1
+                            self.idx_to_point[new_index] = sym_point
+                            self.labels = np.append(self.labels, "new")
+                            active_list.append(new_index)
+                            valid_found = True
+                    if valid_found:
+                        break
+
+            if not valid_found:
+                active_list.remove(i)
+
+        return np.array(self.samples), self.labels
