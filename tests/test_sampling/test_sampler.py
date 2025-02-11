@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from consir.sampling import hierarchical_sampler
+from consir.sampling.bottomup import hierarchical_sampler
 
 
 def test_shift_labels_basic():

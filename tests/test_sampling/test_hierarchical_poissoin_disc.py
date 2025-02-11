@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from consir.sampling.hierarchical_poisson_disc import PoissonDiskSampler
+from consir.sampling.bottomup.hierarchical_poisson_disc import PoissonDiskSampler
 
 
 def test_initialization():

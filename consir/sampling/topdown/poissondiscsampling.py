@@ -1,7 +1,5 @@
 import numpy as np
 from scipy.spatial import KDTree
-import matplotlib.pyplot as plt
-
 
 class PoissonDiskSamplerWithExisting(object):
     """
@@ -13,10 +11,12 @@ class PoissonDiskSamplerWithExisting(object):
         r (float): Minimum distance between samples.
         k (int): Maximum number of attempts to generate a new sample around each existing sample.
         existing_points (ndarray): Array of points that already exist in the domain and must be respected.
+        existing_labels (ndarray): Array of labels corresponding to existing points.
         wrap (bool): Whether to use wrap-around edges for tiling.
     """
 
-    def __init__(self, domain, r, existing_points=None, k=60, symmetry_operators=None, wrap=False):
+    def __init__(self, domain, r, existing_points=None, existing_labels=None,
+                 k=60, symmetry_operators=None, wrap=False):
         """
         Initializes the PoissonDiskSamplerWithExisting with the given domain, minimum distance, and optional parameters.
 
@@ -24,6 +24,7 @@ class PoissonDiskSamplerWithExisting(object):
             domain (list of tuples): Boundaries for each dimension in the domain, as (min, max) pairs.
             r (float): Minimum distance between samples.
             existing_points (ndarray, optional): Array of pre-existing points. Defaults to None.
+            existing_labels (ndarray, optional): Array of labels for pre-existing points. Defaults to None.
             k (int, optional): Maximum number of attempts to generate a new sample. Defaults to 60.
             symmetry_operators (list of callables, optional): List of symmetry operations to apply to the points. Each operator is a function that takes a point and returns a transformed point.
             wrap (bool, optional): Whether to use wrap-around edges for tiling. Defaults to False.
@@ -41,7 +42,8 @@ class PoissonDiskSamplerWithExisting(object):
             self.samples = existing_points.tolist()
             self.idx_to_point = {i: pt for i, pt in enumerate(existing_points)}
             self.kdtree = KDTree(existing_points)
-            self.labels = np.array(["existing"] * len(existing_points))  # Labels for existing points
+            self.labels = existing_labels if existing_labels is not None else np.array(
+                ["existing"] * len(existing_points))
         else:
             self.samples = []
             self.idx_to_point = {}
@@ -58,7 +60,8 @@ class PoissonDiskSamplerWithExisting(object):
         Returns:
             ndarray: Array of new points around the given point.
         """
-        radius = np.sqrt(np.random.uniform(self.r**2, (2 * self.r) ** 2, self.k))
+        radius = np.sqrt(
+            np.random.uniform(self.r ** 2, (2 * self.r) ** 2, self.k))
         directions = np.random.normal(0, 1, (self.k, self.dimensions))
         unit_vectors = directions / np.linalg.norm(directions, axis=1)[:, None]
         new_points = point + radius[:, None] * unit_vectors
@@ -67,43 +70,33 @@ class PoissonDiskSamplerWithExisting(object):
             # Apply wrap-around for each dimension with arbitrary bounds
             for dim in range(self.dimensions):
                 min_bound, max_bound = self.domain[dim]
-                new_points[:, dim] = (new_points[:, dim] - min_bound) % (max_bound - min_bound) + min_bound
+                new_points[:, dim] = (new_points[:, dim] - min_bound) % (
+                            max_bound - min_bound) + min_bound
 
         return new_points
 
     def is_valid_point(self, point):
-        """
-        Checks if a point is valid by ensuring it doesn't violate the minimum distance rule.
-
-        Args:
-            point (array-like): The point to check.
-
-        Returns:
-            bool: True if the point is valid, False otherwise.
-        """
+        """Optimized version of point validation."""
         if np.any(point < self.domain[:, 0]) or np.any(point >= self.domain[:, 1]):
             return False
 
         if self.kdtree is not None:
-            # Use KDTree to find the nearest neighbors within distance r
-            indices = self.kdtree.query_ball_point(point, self.r)
-            if len(indices) > 0:
+            if len(self.kdtree.query_ball_point(point, self.r)) > 0:
                 return False
 
-        # Check against the new points being added in this sampling iteration
-        for existing_point in self.samples:
+        if len(self.samples) > 0:
+            # Vectorized distance calculation
+            points = np.array(self.samples)
             if self.wrap:
-                # Apply wrap-around distance calculation with arbitrary bounds
-                dist = np.sqrt(np.sum(
-                    np.minimum(
-                        np.abs(point - existing_point),
-                        (self.domain[:, 1] - self.domain[:, 0]) - np.abs(point - existing_point)
-                    ) ** 2
-                ))
+                # Vectorized wrap-around distance calculation
+                diff = np.abs(point - points)
+                domain_size = self.domain[:, 1] - self.domain[:, 0]
+                wrapped_diff = np.minimum(diff, domain_size - diff)
+                distances = np.sqrt(np.sum(wrapped_diff ** 2, axis=1))
             else:
-                dist = np.linalg.norm(point - existing_point)
-
-            if dist < self.r:
+                distances = np.sqrt(np.sum((point - points) ** 2, axis=1))
+            
+            if np.any(distances < self.r):
                 return False
 
         return True
@@ -125,33 +118,53 @@ class PoissonDiskSamplerWithExisting(object):
                 symmetric_points.append(transformed_point)
         return symmetric_points
 
-    def sample(self):
+    def sample(self, new_label=None, return_new_only=False):
         """
         Generates a sample of points using the Poisson Disk Sampling method, constrained by existing points.
 
+        Args:
+            new_label (int, optional): Label to assign to newly generated points. Defaults to None.
+            return_new_only (bool, optional): Whether to return only the newly sampled points. Defaults to False.
+
         Returns:
-            tuple: An array of newly sampled points and an array of labels ("existing" or "new").
+            tuple: An array of sampled points and an array of labels.
         """
+        if new_label is None:
+            new_label = 0
+            if len(self.labels) > 0:
+                new_label = int(np.max(self.labels) + 1)
+
         if not self.samples:
             # If no existing points, initialize with a random point in the domain
-            initial_point = np.random.uniform(self.domain[:, 0], self.domain[:, 1], self.dimensions)
+            initial_point = np.random.uniform(self.domain[:, 0],
+                                              self.domain[:, 1],
+                                              self.dimensions)
             symmetric_points = self.apply_symmetry(initial_point)
             self.samples.extend(symmetric_points)
             for idx, point in enumerate(symmetric_points):
                 self.idx_to_point[idx] = point
-            self.labels = np.concatenate((self.labels, np.array(["new"] * len(symmetric_points))))
+            self.labels = np.concatenate((self.labels, np.array(
+                [new_label if new_label is not None else "new"] * len(
+                    symmetric_points))))
             active_list = list(range(len(self.samples)))
         else:
             # Start with all existing points as active
             active_list = list(range(len(self.samples)))
 
+        new_points = []
+        new_labels = []
+
+        # Update KDTree periodically (every 100 new points)
+        update_frequency = 10
+        points_since_update = 0
+        
         while active_list:
             i = np.random.choice(active_list)
             current_point = self.samples[i]
-            new_points = self.generate_points_around(current_point)
+            generated_points = self.generate_points_around(current_point)
 
             valid_found = False
-            for point in new_points:
+            for point in generated_points:
                 if self.is_valid_point(point):
                     symmetric_points = self.apply_symmetry(point)
                     for sym_point in symmetric_points:
@@ -159,8 +172,11 @@ class PoissonDiskSamplerWithExisting(object):
                             self.samples.append(sym_point)
                             new_index = len(self.samples) - 1
                             self.idx_to_point[new_index] = sym_point
-                            self.labels = np.append(self.labels, "new")
+                            label = new_label if new_label is not None else "new"
+                            self.labels = np.append(self.labels, label)
                             active_list.append(new_index)
+                            new_points.append(sym_point)
+                            new_labels.append(label)
                             valid_found = True
                     if valid_found:
                         break
@@ -168,4 +184,12 @@ class PoissonDiskSamplerWithExisting(object):
             if not valid_found:
                 active_list.remove(i)
 
-        return np.array(self.samples), self.labels
+            points_since_update += 1
+            if points_since_update >= update_frequency:
+                self.kdtree = KDTree(np.array(self.samples))
+                points_since_update = 0
+
+        if return_new_only:
+            return np.array(new_points), np.array(new_labels)
+        else:
+            return np.array(self.samples), self.labels

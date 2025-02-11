@@ -1,5 +1,6 @@
 import torch
 
+
 class DataEngine:
     def __init__(self, data_tensor):
         """

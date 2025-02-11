@@ -1,11 +1,11 @@
 import numpy as np
 import pytest
-from consir.sampling.hierarchical_poisson_disc import PoissonDiskSamplingPrecomputed
+from consir.sampling.bottomup.hierarchical_poisson_disc import PoissonDiskSamplingPrecomputed
 
 
 import numpy as np
 import pytest
-from consir.sampling.hierarchical_poisson_disc import PoissonDiskSamplingPrecomputed
+from consir.sampling.bottomup.hierarchical_poisson_disc import PoissonDiskSamplingPrecomputed
 
 def test_precomputed_initialization():
     points = np.random.uniform(0, 1, (100, 2))
